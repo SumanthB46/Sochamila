@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_middleware_1 = require("../../middlewares/auth.middleware");
+const role_middleware_1 = require("../../middlewares/role.middleware");
+const client_1 = require("@prisma/client");
+const wishlist_controller_1 = require("./wishlist.controller");
+const router = (0, express_1.Router)();
+router.get("/", auth_middleware_1.authMiddleware, (0, role_middleware_1.roleMiddleware)([client_1.Role.CUSTOMER, client_1.Role.ADMIN]), (req, res) => (0, wishlist_controller_1.getWishlist)(req, res));
+router.post("/", auth_middleware_1.authMiddleware, (0, role_middleware_1.roleMiddleware)([client_1.Role.CUSTOMER, client_1.Role.ADMIN]), (req, res) => (0, wishlist_controller_1.addWishlistItem)(req, res));
+router.delete("/:id", auth_middleware_1.authMiddleware, (0, role_middleware_1.roleMiddleware)([client_1.Role.CUSTOMER, client_1.Role.ADMIN]), (req, res) => (0, wishlist_controller_1.removeWishlistItemController)(req, res));
+exports.default = router;

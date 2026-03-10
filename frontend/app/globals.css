@@ -1,0 +1,103 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* ----------------------------------
+   Utilities
+---------------------------------- */
+
+/* Hide Scrollbar Everywhere */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Hide scrollbar for category strip */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ----------------------------------
+   Animations
+---------------------------------- */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fadeIn {
+  animation: fadeIn .2s ease-out;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.animate-slideUp {
+  animation: slideUp .25s ease-out;
+}
+
+/* ----------------------------------
+   Components (IMPORTANT)
+---------------------------------- */
+
+@layer components {
+  .social-btn {
+    @apply w-full flex items-center justify-center gap-3 py-2.5
+           border rounded-xl shadow-sm text-sm font-medium
+           transition hover:bg-gray-50;
+  }
+
+  .label {
+    @apply text-sm font-medium text-gray-600;
+  }
+
+  .input-wrapper {
+    @apply relative flex items-center mt-1;
+  }
+
+  .input {
+    @apply w-full px-10 py-2 border rounded-xl outline-none
+           focus:ring-2 focus:ring-blue-500;
+  }
+
+  .icon {
+    @apply absolute left-3 text-gray-400;
+  }
+}
+
+/* product page  */
+@keyframes gradient-soft {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-gradient-soft {
+  animation: gradient-soft 4s ease infinite;
+}
+
+
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+
+
+/* vendor register page */
+.input-light {
+  @apply w-full px-4 py-3 rounded-xl
+  border border-gray-300
+  bg-gray-50
+  text-gray-800
+  placeholder-gray-400
+  focus:outline-none
+  focus:ring-2
+  focus:ring-indigo-400
+  transition;
+}

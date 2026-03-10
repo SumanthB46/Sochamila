@@ -1,0 +1,681 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/**
+ * ======================================================
+ * ENUMS
+ * ======================================================
+ */
+
+enum Role {
+  CUSTOMER
+  VENDOR
+  DESIGNER
+  ADMIN
+}
+
+enum VendorKycStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum Gender {
+  MEN
+  WOMEN
+  KIDS
+  UNISEX
+}
+
+enum ProductDepartment {
+  CLOTHING
+  ACCESSORIES
+  HOME_LIVING
+  GEAR
+}
+
+enum ProductType {
+  TSHIRT
+  SHIRT
+  HOODIE
+  SWEATSHIRT
+  JACKET
+  CAP
+  MUG
+  BAG
+  PHONE_CASE
+}
+
+enum OrderStatus {
+  PLACED
+  CONFIRMED
+  ASSIGNED
+  PRINTING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum FulfillmentStatus {
+  PENDING
+  IN_PROGRESS
+  READY_FOR_PICKUP
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum DiscountType {
+  FLAT
+  PERCENTAGE
+}
+
+enum MockupView {
+  FRONT
+  BACK
+  LEFT
+  RIGHT
+}
+
+/**
+ * ======================================================
+ * USER
+ * ======================================================
+ */
+
+model User {
+  id       String @id @default(uuid())
+  name     String
+  email    String @unique
+  password String
+
+  role     Role    @default(CUSTOMER)
+  isActive Boolean @default(true)
+
+  // Vendor KYC Fields
+  kycStatus         VendorKycStatus?
+  firstName         String?
+  lastName          String?
+  phone             String?
+  vendorType        String?
+
+  // Vendor KYC Documents
+  aadhaar           String? @unique
+  pan               String? @unique
+  gst               String?
+
+  // Vendor Payout Details
+  payoutMethod      String? // "BANK" or "UPI"
+  accountNumber     String?
+  ifsc              String?
+  upiId             String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cart         Cart?
+  orders       Order[]
+  reviews      Review[]
+  designs      UserDesign[]
+  couponUsages CouponUsage[]
+  payouts           VendorPayout[]
+  commissionConfig  CommissionConfig?
+  vendorInventories VendorInventory[]
+  refreshTokens     RefreshToken[]
+
+  assignedOrderItems OrderItem[] @relation("VendorOrders")
+  addresses          Address[]
+}
+
+/**
+ * ======================================================
+ * REFRESH TOKEN
+ * ======================================================
+ */
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+}
+
+/**
+ * ======================================================
+ * VENDOR INVENTORY
+ * ======================================================
+ */
+model VendorInventory {
+  id        String @id @default(uuid())
+  vendorId  String
+  productId String
+  quantity  Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vendor  User    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId])
+  @@index([productId])
+}
+
+/**
+ * ======================================================
+ * VENDOR COMMISSION CONFIG
+ * ======================================================
+ */
+model CommissionConfig {
+  id                    String  @id @default(uuid())
+  vendorId              String  @unique
+  commissionPercentage  Int     @default(15)
+  minimumOrderValue     Int     @default(0)
+  payoutThreshold       Int     @default(1000)
+  isActive              Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vendor User @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId])
+}
+
+/**
+ * ======================================================
+ * ADDRESS
+ * ======================================================
+ */
+model Address {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  phone     String?
+  street    String
+  city      String
+  state     String
+  zipCode   String
+  country   String   @default("India")
+  isDefault Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/**
+ * ======================================================
+ * PRODUCTS
+ * ======================================================
+ */
+model Product {
+  id          String  @id @default(uuid())
+  name        String
+  description String?
+
+  gender          Gender            @default(UNISEX)
+  department      ProductDepartment @default(CLOTHING)
+  productType     ProductType
+
+  minPrice Int
+
+  isActive    Boolean @default(true)
+  isAvailable Boolean @default(true)
+
+  // Shipping & Return Policy (editable per product)
+  shippingPolicy String @default("Free shipping on orders above ₹500\nStandard delivery: 5-7 business days\nExpress delivery: 2-3 business days (extra charges apply)")
+  returnPolicy   String @default("30-day return window from delivery date\nProduct must be unused and in original packaging\nFree return shipping for defective items")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  images            ProductImage[]
+  colors            ProductColor[]
+  vendorInventories VendorInventory[]
+}
+
+/**
+ * ---------- Product main images ----------
+ */
+
+model ProductImage {
+  id        String @id @default(uuid())
+  productId String
+
+  imageUrl  String
+  sortOrder Int     @default(0)
+  isPrimary Boolean @default(false)
+  position  String  @default("other") // front, back, side, detail, other
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, sortOrder])
+  @@index([productId])
+}
+
+/**
+ * ---------- Product colors ----------
+ */
+
+model ProductColor {
+  id        String @id @default(uuid())
+  productId String
+
+  name    String
+  hexCode String?
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  images ProductColorImage[]
+  sizes  ProductSize[]
+
+  @@index([productId])
+}
+
+/**
+ * ---------- Color-wise images ----------
+ */
+
+model ProductColorImage {
+  id      String @id @default(uuid())
+  colorId String
+
+  imageUrl  String
+  sortOrder Int    @default(0)
+
+  color ProductColor @relation(fields: [colorId], references: [id], onDelete: Cascade)
+
+  @@index([colorId])
+}
+
+/**
+ * ---------- Sizes ----------
+ */
+
+model ProductSize {
+  id      String @id @default(uuid())
+  colorId String
+
+  size String
+  sku  String @unique
+
+  mrp       Int
+  price     Int
+  costPrice Int?
+
+  stock         Int
+  lowStockAlert Int?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  color ProductColor @relation(fields: [colorId], references: [id], onDelete: Cascade)
+
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+
+  @@index([colorId])
+}
+
+/**
+ * ======================================================
+ * DESIGN PRODUCTS
+ * ======================================================
+ */
+
+model DesignProduct {
+  id          String      @id @default(uuid())
+  name        String
+  productType ProductType
+  basePrice   Int
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  colors      DesignProductColor[]
+  userDesigns UserDesign[]
+}
+
+model DesignProductColor {
+  id              String @id @default(uuid())
+  designProductId String
+
+  name    String
+  hexCode String?
+
+  designProduct DesignProduct @relation(fields: [designProductId], references: [id], onDelete: Cascade)
+
+  images      DesignProductImage[]
+  userDesigns UserDesign[]
+
+  @@index([designProductId])
+}
+
+model DesignProductImage {
+  id      String @id @default(uuid())
+  colorId String
+
+  view     MockupView
+  imageUrl String
+
+  color DesignProductColor @relation(fields: [colorId], references: [id], onDelete: Cascade)
+
+  @@index([colorId])
+}
+
+/**
+ * ======================================================
+ * USER DESIGN
+ * ======================================================
+ */
+
+model UserDesign {
+  id String @id @default(uuid())
+
+  userId          String
+  designProductId String
+  colorId         String
+
+  previewImage String
+  designJson   Json
+
+  createdAt DateTime @default(now())
+
+  user          User               @relation(fields: [userId], references: [id])
+  designProduct DesignProduct      @relation(fields: [designProductId], references: [id])
+  color         DesignProductColor @relation(fields: [colorId], references: [id])
+
+  customCartItems  CustomCartItem[]
+  customOrderItems CustomOrderItem[]
+
+  @@index([userId])
+}
+
+/**
+ * ======================================================
+ * CART
+ * ======================================================
+ */
+
+model Cart {
+  id     String @id @default(uuid())
+  userId String @unique
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  items       CartItem[]
+  customItems CustomCartItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CartItem {
+  id       String @id @default(uuid())
+  cartId   String
+  sizeId   String
+  quantity Int
+
+  cart Cart        @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  size ProductSize @relation(fields: [sizeId], references: [id])
+
+  @@index([cartId])
+}
+
+model CustomCartItem {
+  id String @id @default(uuid())
+
+  cartId   String
+  designId String
+
+  quantity Int
+  price    Int
+
+  cart   Cart       @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  design UserDesign @relation(fields: [designId], references: [id])
+
+  @@index([cartId])
+}
+
+/**
+ * ======================================================
+ * ORDER
+ * ======================================================
+ */
+
+model Order {
+  id     String @id @default(uuid())
+  userId String
+
+  totalAmount   Int
+  status        OrderStatus   @default(PLACED)
+  paymentStatus PaymentStatus @default(PENDING)
+
+  couponId String?
+  coupon   Coupon? @relation(fields: [couponId], references: [id])
+
+  user User @relation(fields: [userId], references: [id])
+
+  items        OrderItem[]
+  customItems  CustomOrderItem[]
+  couponUsages CouponUsage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model OrderItem {
+  id      String @id @default(uuid())
+  orderId String
+  sizeId  String
+
+  quantity  Int
+  price     Int
+  costPrice Int?
+
+  // Optional links to the user's design/mockup/PDF for this item
+  imageUrl  String?
+  mockupUrl String?
+  pdfUrl    String?  // Design file or production specs as PDF
+
+  // Additional design information
+  frontName         String?   // Name displayed on front of product
+  stickerUrls       String[]  // Array of sticker image URLs
+  graphicUrls       String[]  // Array of graphic image URLs
+  aiGeneratedImages String[]  // Array of AI generated image URLs
+  mockupImages      Json?     // JSON object containing all mockup views
+
+  vendorId String?
+
+  fulfillmentStatus FulfillmentStatus @default(PENDING)
+  fulfillmentDate   DateTime?
+
+  order  Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  size   ProductSize @relation(fields: [sizeId], references: [id])
+  vendor User?       @relation("VendorOrders", fields: [vendorId], references: [id])
+
+  review Review?
+
+  @@index([orderId])
+  @@index([vendorId])
+}
+
+model CustomOrderItem {
+  id String @id @default(uuid())
+
+  orderId  String
+  designId String
+
+  quantity Int
+  price    Int
+
+  order  Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  design UserDesign @relation(fields: [designId], references: [id])
+
+  @@index([orderId])
+}
+
+/**
+ * ======================================================
+ * COUPONS
+ * ======================================================
+ */
+
+model Coupon {
+  id   String @id @default(uuid())
+  code String @unique
+
+  discountType  DiscountType
+  discountValue Int
+
+  minOrderAmount Int?
+  maxDiscount    Int?
+
+  usageLimit Int?
+  usedCount  Int  @default(0)
+
+  validFrom DateTime
+  validTill DateTime
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  orders Order[]
+  usages CouponUsage[]
+}
+
+model CouponUsage {
+  id String @id @default(uuid())
+
+  couponId String
+  userId   String
+  orderId  String
+
+  coupon Coupon @relation(fields: [couponId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+  order  Order  @relation(fields: [orderId], references: [id])
+
+  @@unique([couponId, userId])
+}
+
+/**
+ * ======================================================
+ * REVIEWS
+ * ======================================================
+ */
+
+model Review {
+  id String @id @default(uuid())
+
+  userId      String
+  orderItemId String
+
+  rating  Int
+  comment String?
+
+  isApproved Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id])
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id])
+
+  @@unique([orderItemId])
+}
+
+/**
+ * ======================================================
+ * VENDOR PAYOUT
+ * ======================================================
+ */
+
+model VendorPayout {
+  id String @id @default(uuid())
+
+  vendorId String
+  amount   Int
+  status   PaymentStatus @default(PENDING)
+
+  vendor User @relation(fields: [vendorId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([vendorId])
+}
+
+/**
+ * ======================================================
+ * GRAPHICS
+ * ======================================================
+ */
+
+model Graphic {
+  id        String   @id @default(uuid())
+  imageUrl  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/**
+ * ======================================================
+ * STICKERS
+ * ======================================================
+ */
+
+model StickerCategory {
+  id   String @id @default(uuid())
+  name String @unique
+
+  stickers Sticker[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Sticker {
+  id         String  @id @default(uuid())
+  name       String
+  imageUrl   String
+  usageCount Int     @default(0)
+  isActive   Boolean @default(true)
+
+  categoryId String
+  category   StickerCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId])
+}
